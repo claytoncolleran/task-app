@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: .
     plan: free
-    buildCommand: npm install && npm run build:shared && npm --workspace api run build && npm --workspace api run db:migrate
+    buildCommand: npm install --include=dev && npm run build:shared && npm --workspace api run build && npm --workspace api run db:migrate
     startCommand: npm --workspace api run start
     healthCheckPath: /health
     envVars:
@@ -25,7 +25,7 @@ services:
     name: task-app-web
     runtime: static
     rootDir: .
-    buildCommand: npm install && npm run build:shared && npm --workspace web run build
+    buildCommand: npm install --include=dev && npm run build:shared && npm --workspace web run build
     staticPublishPath: web/dist
     envVars:
       - key: VITE_API_URL
