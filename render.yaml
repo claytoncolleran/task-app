@@ -2,7 +2,7 @@ databases:
   - name: task-app-db
     databaseName: task_app
     user: task_app
-    plan: starter
+    plan: basic_256mb
 
 services:
   - type: web
