@@ -1,0 +1,20 @@
+{
+  "name": "task-app",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "api",
+    "web"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace api run dev",
+    "dev:web": "npm --workspace web run dev",
+    "build:shared": "npm --workspace shared run build",
+    "build:api": "npm --workspace api run build",
+    "build:web": "npm --workspace web run build",
+    "build": "npm run build:shared && npm run build:api && npm run build:web",
+    "db:generate": "npm --workspace api run db:generate",
+    "db:migrate": "npm --workspace api run db:migrate"
+  }
+}
