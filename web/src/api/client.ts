@@ -37,8 +37,8 @@ export const api = {
   requestMagicLink(email: string): Promise<{ ok: true }> {
     return request("/auth/request", { method: "POST", body: JSON.stringify({ email }) });
   },
-  verifyMagicLink(token: string): Promise<AuthSessionResponse> {
-    return request("/auth/verify", { method: "POST", body: JSON.stringify({ token }) });
+  verifyMagicCode(email: string, code: string): Promise<AuthSessionResponse> {
+    return request("/auth/verify", { method: "POST", body: JSON.stringify({ email, code }) });
   },
   pullSync(since: string | null): Promise<SyncPullResponse> {
     const q = since ? `?since=${encodeURIComponent(since)}` : "";

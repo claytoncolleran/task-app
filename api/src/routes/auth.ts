@@ -5,10 +5,17 @@ import { eq, and, isNull, gt } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { users, magicLinks } from "../db/schema.js";
 import { signSession } from "../auth/jwt.js";
-import { sendMagicLink } from "../auth/mailer.js";
+import { sendMagicCode } from "../auth/mailer.js";
 
 const requestSchema = z.object({ email: z.string().email() });
-const verifySchema = z.object({ token: z.string().min(10) });
+const verifySchema = z.object({
+  email: z.string().email(),
+  code: z.string().regex(/^\d{6}$/),
+});
+
+function generateCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/request", async (req, reply) => {
@@ -16,31 +23,31 @@ export async function authRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: "invalid_email" });
     const email = parsed.data.email.toLowerCase().trim();
 
-    const token = nanoid(32);
+    const code = generateCode();
+    const token = `${code}-${nanoid(8)}`;
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await db.insert(magicLinks).values({ token, email, expiresAt });
 
-    const appUrl = process.env.APP_URL ?? "http://localhost:5173";
-    const link = `${appUrl}/auth/verify?token=${encodeURIComponent(token)}`;
-    await sendMagicLink(email, link);
+    await sendMagicCode(email, code);
 
     return { ok: true };
   });
 
   app.post("/auth/verify", async (req, reply) => {
     const parsed = verifySchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: "invalid_token" });
-    const { token } = parsed.data;
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_request" });
+    const email = parsed.data.email.toLowerCase().trim();
+    const { code } = parsed.data;
 
-    const [row] = await db
+    const candidates = await db
       .select()
       .from(magicLinks)
-      .where(and(eq(magicLinks.token, token), isNull(magicLinks.consumedAt), gt(magicLinks.expiresAt, new Date())))
-      .limit(1);
+      .where(and(eq(magicLinks.email, email), isNull(magicLinks.consumedAt), gt(magicLinks.expiresAt, new Date())));
 
+    const row = candidates.find((r) => r.token.startsWith(`${code}-`));
     if (!row) return reply.code(400).send({ error: "invalid_or_expired" });
 
-    await db.update(magicLinks).set({ consumedAt: new Date() }).where(eq(magicLinks.token, token));
+    await db.update(magicLinks).set({ consumedAt: new Date() }).where(eq(magicLinks.token, row.token));
 
     const [existing] = await db.select().from(users).where(eq(users.email, row.email)).limit(1);
     let user = existing;
