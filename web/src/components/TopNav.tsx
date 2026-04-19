@@ -8,18 +8,18 @@ interface Props {
   onHome: () => void;
 }
 
-export function TopNav({ search, onSearchChange, onAdd, onOpenMenu, onHome }: Props) {
+export function TopNav({ search, onSearchChange, onAdd, onOpenMenu }: Props) {
   const [focused, setFocused] = useState(false);
 
   return (
     <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-ink-100 bg-white/95 px-3 py-2 backdrop-blur">
       <button
-        onClick={onHome}
-        aria-label="Home"
+        onClick={onAdd}
+        aria-label="Add task"
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-900 text-white"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M5 13l4 4L19 7" />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
 
@@ -37,16 +37,6 @@ export function TopNav({ search, onSearchChange, onAdd, onOpenMenu, onHome }: Pr
           className="w-full bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-ink-300"
         />
       </div>
-
-      <button
-        onClick={onAdd}
-        aria-label="Add task"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-ink-100 hover:border-ink-300"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
 
       <button
         onClick={onOpenMenu}

@@ -47,7 +47,11 @@ export const tasks = pgTable(
     recurring: jsonb("recurring").$type<{
       enabled: boolean;
       frequency: "daily" | "weekly" | "monthly" | "yearly";
-      pattern?: string;
+      interval: number;
+      daysOfWeek?: number[];
+      monthly?:
+        | { kind: "dayOfMonth"; day: number }
+        | { kind: "nthWeekday"; nth: number; weekday: number };
       endDate?: string | null;
     } | null>(),
     createdDate: timestamp("created_date", { withTimezone: true }).defaultNow().notNull(),

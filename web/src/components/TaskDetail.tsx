@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
-import type { Task, RecurringFrequency } from "@task-app/shared";
-import { useGroups } from "../hooks/useTasks.js";
+import { useEffect, useRef, useState } from "react";
+import type { Task, RecurringConfig } from "@task-app/shared";
 import { deleteTask, updateTask } from "../sync/mutations.js";
 import { toDateInputValue, fromDateInputValue } from "../utils/dates.js";
 import { api } from "../api/client.js";
+import { GroupSelect } from "./GroupSelect.js";
+import { RecurringEditor } from "./RecurringEditor.js";
+import { describeRecurring } from "../utils/recurring.js";
 
 interface Props {
   task: Task | null;
@@ -11,15 +13,14 @@ interface Props {
 }
 
 export function TaskDetail({ task, onClose }: Props) {
-  const groups = useGroups();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [groupId, setGroupId] = useState<string | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
-  const [recurringEnabled, setRecurringEnabled] = useState(false);
-  const [recurringFreq, setRecurringFreq] = useState<RecurringFrequency>("weekly");
+  const [recurring, setRecurring] = useState<RecurringConfig | null>(null);
   const [fetchingTitle, setFetchingTitle] = useState(false);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!task) return;
@@ -28,9 +29,15 @@ export function TaskDetail({ task, onClose }: Props) {
     setDueDate(toDateInputValue(task.dueDate));
     setGroupId(task.groupId);
     setLinkUrl(task.link?.url ?? "");
-    setRecurringEnabled(task.recurring?.enabled ?? false);
-    setRecurringFreq(task.recurring?.frequency ?? "weekly");
+    setRecurring(task.recurring ?? null);
   }, [task]);
+
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title, task]);
 
   if (!task) return null;
 
@@ -57,7 +64,7 @@ export function TaskDetail({ task, onClose }: Props) {
       dueDate: fromDateInputValue(dueDate),
       groupId,
       link,
-      recurring: recurringEnabled ? { enabled: true, frequency: recurringFreq } : null,
+      recurring,
     });
     onClose();
   }
@@ -79,7 +86,7 @@ export function TaskDetail({ task, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/30 p-4 pt-[6vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[6vh]" onClick={onClose}>
       <div className="w-full max-w-lg rounded-xl bg-white shadow-lg" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-ink-100 p-3">
           <div className="text-xs uppercase tracking-wide text-ink-500">Edit task</div>
@@ -88,10 +95,12 @@ export function TaskDetail({ task, onClose }: Props) {
           </button>
         </div>
         <div className="space-y-4 p-4">
-          <input
+          <textarea
+            ref={titleRef}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-lg outline-none"
+            rows={1}
+            className="w-full resize-none break-words text-lg leading-tight outline-none"
             placeholder="Task title"
           />
 
@@ -107,16 +116,7 @@ export function TaskDetail({ task, onClose }: Props) {
             </div>
             <div>
               <div className="mb-1 text-xs uppercase tracking-wide text-ink-500">Group</div>
-              <select
-                value={groupId ?? ""}
-                onChange={(e) => setGroupId(e.target.value || null)}
-                className="w-full rounded border border-ink-100 px-2 py-1 text-sm"
-              >
-                <option value="">No group</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
+              <GroupSelect value={groupId} onChange={setGroupId} />
             </div>
           </div>
 
@@ -151,28 +151,10 @@ export function TaskDetail({ task, onClose }: Props) {
             />
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={recurringEnabled}
-                onChange={(e) => setRecurringEnabled(e.target.checked)}
-              />
-              Recurring
-            </label>
-            {recurringEnabled && (
-              <select
-                value={recurringFreq}
-                onChange={(e) => setRecurringFreq(e.target.value as RecurringFrequency)}
-                className="rounded border border-ink-100 px-2 py-1 text-sm"
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-              </select>
-            )}
-          </div>
+          <RecurringEditor value={recurring} dueDate={dueDate ? fromDateInputValue(dueDate) : null} onChange={setRecurring} />
+          {recurring?.enabled && (
+            <div className="text-xs text-ink-500">{describeRecurring(recurring)}</div>
+          )}
         </div>
 
         <div className="flex items-center justify-between border-t border-ink-100 p-3">

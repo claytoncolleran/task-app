@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { createGroup, createTask } from "../sync/mutations.js";
-import { useGroups } from "../hooks/useTasks.js";
+import type { RecurringConfig } from "@task-app/shared";
+import { createTask } from "../sync/mutations.js";
 import { fromDateInputValue } from "../utils/dates.js";
+import { GroupSelect } from "./GroupSelect.js";
+import { RecurringEditor } from "./RecurringEditor.js";
 
 interface Props {
   open: boolean;
@@ -10,12 +12,10 @@ interface Props {
 }
 
 export function AddTaskModal({ open, defaultGroupId, onClose }: Props) {
-  const groups = useGroups();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState(todayValue());
   const [groupId, setGroupId] = useState<string | null>(defaultGroupId ?? null);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [recurring, setRecurring] = useState<RecurringConfig | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -23,8 +23,7 @@ export function AddTaskModal({ open, defaultGroupId, onClose }: Props) {
       setTitle("");
       setDueDate(todayValue());
       setGroupId(defaultGroupId ?? null);
-      setNewGroupName("");
-      setCreatingGroup(false);
+      setRecurring(null);
       setTimeout(() => inputRef.current?.focus(), 30);
     }
   }, [open, defaultGroupId]);
@@ -34,22 +33,22 @@ export function AddTaskModal({ open, defaultGroupId, onClose }: Props) {
   async function submit() {
     const t = title.trim();
     if (!t) return;
-    let gid = groupId;
-    if (creatingGroup && newGroupName.trim()) {
-      const g = await createGroup(newGroupName.trim());
-      gid = g.id;
-    }
-    await createTask({ title: t, dueDate: fromDateInputValue(dueDate), groupId: gid });
+    await createTask({
+      title: t,
+      dueDate: fromDateInputValue(dueDate),
+      groupId,
+      recurring,
+    });
     onClose();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[10vh]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[10vh]" onClick={onClose}>
       <div
         className="w-full max-w-md rounded-xl bg-white shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4">
+        <div className="space-y-4 p-4">
           <input
             ref={inputRef}
             value={title}
@@ -62,7 +61,7 @@ export function AddTaskModal({ open, defaultGroupId, onClose }: Props) {
             className="w-full border-b border-ink-100 pb-2 text-lg outline-none placeholder:text-ink-300"
           />
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs uppercase tracking-wide text-ink-500">Due</label>
             <input
               type="date"
@@ -72,36 +71,16 @@ export function AddTaskModal({ open, defaultGroupId, onClose }: Props) {
             />
           </div>
 
-          <div className="mt-3">
+          <div>
             <div className="mb-1 text-xs uppercase tracking-wide text-ink-500">Group</div>
-            <div className="flex flex-wrap gap-1.5">
-              <GroupPill active={groupId === null && !creatingGroup} onClick={() => { setGroupId(null); setCreatingGroup(false); }}>
-                None
-              </GroupPill>
-              {groups.slice(0, 10).map((g) => (
-                <GroupPill
-                  key={g.id}
-                  active={groupId === g.id && !creatingGroup}
-                  onClick={() => { setGroupId(g.id); setCreatingGroup(false); }}
-                >
-                  {g.name}
-                </GroupPill>
-              ))}
-              {groups.length < 10 && (
-                <GroupPill active={creatingGroup} onClick={() => setCreatingGroup(true)}>
-                  + New
-                </GroupPill>
-              )}
-            </div>
-            {creatingGroup && (
-              <input
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Group name"
-                className="mt-2 w-full rounded border border-ink-100 px-2 py-1 text-sm outline-none"
-              />
-            )}
+            <GroupSelect value={groupId} onChange={setGroupId} />
           </div>
+
+          <RecurringEditor
+            value={recurring}
+            dueDate={fromDateInputValue(dueDate)}
+            onChange={setRecurring}
+          />
         </div>
 
         <div className="flex justify-end gap-2 border-t border-ink-100 p-3">
@@ -118,19 +97,6 @@ export function AddTaskModal({ open, defaultGroupId, onClose }: Props) {
         </div>
       </div>
     </div>
-  );
-}
-
-function GroupPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full border px-2.5 py-1 text-xs ${
-        active ? "border-ink-900 bg-ink-900 text-white" : "border-ink-100 bg-white text-ink-700 hover:border-ink-300"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

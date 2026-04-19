@@ -5,11 +5,32 @@ import { db } from "../db/index.js";
 import { tasks, groups } from "../db/schema.js";
 import { requireAuth } from "../auth/jwt.js";
 
+const weekDaySchema = z.union([
+  z.literal(0),
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(5),
+  z.literal(6),
+]);
+
+const monthlyModeSchema = z.union([
+  z.object({ kind: z.literal("dayOfMonth"), day: z.number().int().min(1).max(31) }),
+  z.object({
+    kind: z.literal("nthWeekday"),
+    nth: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(-1)]),
+    weekday: weekDaySchema,
+  }),
+]);
+
 const recurringSchema = z
   .object({
     enabled: z.boolean(),
     frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
-    pattern: z.string().optional(),
+    interval: z.number().int().min(1).max(365),
+    daysOfWeek: z.array(weekDaySchema).optional(),
+    monthly: monthlyModeSchema.optional(),
     endDate: z.string().nullable().optional(),
   })
   .nullable();

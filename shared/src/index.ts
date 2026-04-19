@@ -1,9 +1,17 @@
 export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
+export type WeekDay = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type MonthlyMode =
+  | { kind: "dayOfMonth"; day: number }
+  | { kind: "nthWeekday"; nth: 1 | 2 | 3 | 4 | -1; weekday: WeekDay };
+
 export interface RecurringConfig {
   enabled: boolean;
   frequency: RecurringFrequency;
-  pattern?: string;
+  interval: number;
+  daysOfWeek?: WeekDay[];
+  monthly?: MonthlyMode;
   endDate?: string | null;
 }
 

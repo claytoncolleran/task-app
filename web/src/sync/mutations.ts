@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import type { Task, Group, RecurringConfig, TaskLink } from "@task-app/shared";
 import { db } from "../db/dexie.js";
 import { markDirty, runSync } from "./sync.js";
+import { nextOccurrence } from "../utils/recurring.js";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -15,6 +16,7 @@ export interface NewTaskInput {
   title: string;
   dueDate: string | null;
   groupId: string | null;
+  recurring?: RecurringConfig | null;
 }
 
 export async function createTask(input: NewTaskInput): Promise<Task> {
@@ -29,7 +31,7 @@ export async function createTask(input: NewTaskInput): Promise<Task> {
     link: null,
     isCompleted: false,
     completedDate: null,
-    recurring: null,
+    recurring: input.recurring ?? null,
     createdDate: now,
     updatedAt: now,
     deletedAt: null,
@@ -61,13 +63,32 @@ export async function updateTask(id: string, patch: TaskPatch): Promise<void> {
 export async function toggleTaskComplete(id: string, complete: boolean): Promise<void> {
   const existing = await db.tasks.get(id);
   if (!existing) return;
+  const now = nowIso();
   const updated: Task = {
     ...existing,
     isCompleted: complete,
-    completedDate: complete ? nowIso() : null,
-    updatedAt: nowIso(),
+    completedDate: complete ? now : null,
+    updatedAt: now,
   };
   await db.tasks.put(updated);
+
+  if (complete && existing.recurring?.enabled && !existing.deletedAt) {
+    const nextDue = nextOccurrence(existing.recurring, existing.dueDate ?? now);
+    if (nextDue) {
+      const spawned: Task = {
+        ...existing,
+        id: nanoid(),
+        dueDate: nextDue,
+        isCompleted: false,
+        completedDate: null,
+        createdDate: now,
+        updatedAt: now,
+        deletedAt: null,
+      };
+      await db.tasks.put(spawned);
+    }
+  }
+
   await markDirty();
   void runSync();
 }
