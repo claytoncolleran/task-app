@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Task, RecurringConfig } from "@task-app/shared";
+import type { Task, RecurringConfig, TaskLink } from "@task-app/shared";
 import { deleteTask, updateTask } from "../sync/mutations.js";
 import { toDateInputValue, fromDateInputValue } from "../utils/dates.js";
 import { api } from "../api/client.js";
@@ -19,17 +19,24 @@ export function TaskDetail({ task, onClose }: Props) {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [recurring, setRecurring] = useState<RecurringConfig | null>(null);
-  const [fetchingTitle, setFetchingTitle] = useState(false);
+  const [link, setLink] = useState<TaskLink | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const loadedTaskId = useRef<string | null>(null);
+  const initialLinkUrl = useRef<string>("");
 
   useEffect(() => {
     if (!task) return;
+    loadedTaskId.current = task.id;
     setTitle(task.title);
     setDescription(task.description ?? "");
     setDueDate(toDateInputValue(task.dueDate));
     setGroupId(task.groupId);
     setLinkUrl(task.link?.url ?? "");
+    setLink(task.link);
     setRecurring(task.recurring ?? null);
+    initialLinkUrl.current = task.link?.url ?? "";
+    setSavedAt(null);
   }, [task]);
 
   useEffect(() => {
@@ -39,35 +46,46 @@ export function TaskDetail({ task, onClose }: Props) {
     el.style.height = `${el.scrollHeight}px`;
   }, [title, task]);
 
-  if (!task) return null;
-
-  async function save() {
+  useEffect(() => {
     if (!task) return;
-    let link = task.link;
-    const urlTrim = linkUrl.trim();
-    if (urlTrim && urlTrim !== task.link?.url) {
-      setFetchingTitle(true);
-      try {
-        const r = await api.fetchLinkTitle(urlTrim);
-        link = { url: r.url, title: r.title };
-      } catch {
-        link = { url: urlTrim, title: urlTrim };
-      } finally {
-        setFetchingTitle(false);
-      }
-    } else if (!urlTrim) {
-      link = null;
+    if (loadedTaskId.current !== task.id) return;
+    const id = setTimeout(() => {
+      void updateTask(task.id, {
+        title: title.trim() || task.title,
+        description,
+        dueDate: fromDateInputValue(dueDate),
+        groupId,
+        link,
+        recurring,
+      });
+      setSavedAt(Date.now());
+    }, 350);
+    return () => clearTimeout(id);
+  }, [title, description, dueDate, groupId, link, recurring, task]);
+
+  useEffect(() => {
+    if (!task) return;
+    if (loadedTaskId.current !== task.id) return;
+    const trimmed = linkUrl.trim();
+    if (trimmed === initialLinkUrl.current) return;
+    if (!trimmed) {
+      setLink(null);
+      initialLinkUrl.current = "";
+      return;
     }
-    await updateTask(task.id, {
-      title: title.trim() || task.title,
-      description,
-      dueDate: fromDateInputValue(dueDate),
-      groupId,
-      link,
-      recurring,
-    });
-    onClose();
-  }
+    const id = setTimeout(async () => {
+      try {
+        const r = await api.fetchLinkTitle(trimmed);
+        setLink({ url: r.url, title: r.title });
+      } catch {
+        setLink({ url: trimmed, title: trimmed });
+      }
+      initialLinkUrl.current = trimmed;
+    }, 500);
+    return () => clearTimeout(id);
+  }, [linkUrl, task]);
+
+  if (!task) return null;
 
   async function pasteFromClipboard() {
     try {
@@ -89,9 +107,11 @@ export function TaskDetail({ task, onClose }: Props) {
     <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[6vh]" onClick={onClose}>
       <div className="w-full max-w-lg rounded-xl bg-white shadow-lg" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-ink-100 p-3">
-          <div className="text-xs uppercase tracking-wide text-ink-500">Edit task</div>
+          <div className="text-xs uppercase tracking-wide text-ink-500">
+            Edit task {savedAt && <span className="ml-2 normal-case text-ink-300">Saved</span>}
+          </div>
           <button onClick={onClose} className="rounded px-2 py-1 text-sm text-ink-500 hover:bg-ink-50">
-            Close
+            Done
           </button>
         </div>
         <div className="space-y-4 p-4">
@@ -136,8 +156,8 @@ export function TaskDetail({ task, onClose }: Props) {
                 Paste
               </button>
             </div>
-            {task.link?.title && task.link.title !== task.link.url && (
-              <div className="mt-1 truncate text-xs text-ink-500">{task.link.title}</div>
+            {link?.title && link.title !== link.url && (
+              <div className="mt-1 truncate text-xs text-ink-500">{link.title}</div>
             )}
           </div>
 
@@ -165,11 +185,10 @@ export function TaskDetail({ task, onClose }: Props) {
             Delete
           </button>
           <button
-            onClick={() => void save()}
-            disabled={fetchingTitle}
-            className="rounded bg-ink-900 px-3 py-1.5 text-sm text-white disabled:opacity-40"
+            onClick={onClose}
+            className="rounded bg-ink-900 px-3 py-1.5 text-sm text-white"
           >
-            {fetchingTitle ? "Saving..." : "Save"}
+            Done
           </button>
         </div>
       </div>
